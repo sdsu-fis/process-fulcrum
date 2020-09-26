@@ -83,64 +83,73 @@ df = df.to_dict(orient='records')
 
 
 
-photos_to_process = ['signage_photos', '360_photo']
+photos_to_process = ['signage_photos', 'door_hardware_photos']
 
 
 
 print('\n---------- Processing signage photos ----------\n')
 
+
+
 for i in df:
     
-    if i['signage_photos'] != None:
-        print('\n' + i['_title'] + ' contains ' + str(len(i['signage_photos'].split(','))) + ' photos.')
+    for li in photos_to_process:
+        if i[li] != None:
+            print('\n' + i['_title'] + ' contains ' + str(len(i[li].split(','))) + f'{li}')
 
-        #Check to see if there's already a dir for the given room.  If not, make it.  
-        if not os.path.exists(str(i['room_key'])):
-            os.mkdir(str(i['room_key']))
-            os.chdir(str(i['room_key']))
-            print('Created directory:' + os.getcwd())
-        
-            if not os.path.exists('signage_photos'):
-                os.mkdir('signage_photos')
-                os.chdir('./signage_photos')
-                print('Signage photos directory created.') 
+            #Check to see if there's already a dir for the given room.  If not, make it.  
+            if not os.path.exists(str(i['room_key'])):
+                os.mkdir(str(i['room_key']))
+                #os.chdir(str(i['room_key']))
+                print('Created directory:' + os.getcwd())
+
+            
+
+            if not os.path.exists(li):
                 
-        else:
-            pass
-
-        for rec in i['signage_photos'].split(','):
-            
-            #Get the index position of the photo
-            index_pos = i['signage_photos'].split(',').index(rec)
-            print('Image index position: ' + str(index_pos))
-
-            #Add a suffix as a means of dealing with multiple photos so they don't have duplicate names
-            suffix = index_pos + 1
-            print('Suffix: ' + str(suffix))
-
-            if i['signage_photos_captions'] == None or i['signage_photos_captions'].split(',')[index_pos] == '':
-                print('No captions.  Using default.')
-                file_name = i['sfdb_number'] + '-' + i['room_number'] + '-signage-' + str(suffix)
-            
-            elif i['signage_photos_captions'] != None:
-                print('Images contain captions.')
-                print(i['signage_photos_captions'].split(',')[index_pos])
-                file_name =  i['_title'] + '-' + str(i['signage_photos_captions'].split(',')[index_pos])
-            
+                os.chdir(str(i['room_key']))
+                os.mkdir(li)
+                os.chdir(f'./{li}')
+                print(os.getcwd())
+                print(f'{li} directory created.') 
+                    
             else:
-                file_name = i['sfdb_number'] + '-' + i['room_number'] + '-signage-' + str(suffix)
+            
+                os.chdir(str(i['room_key']))
 
+            for rec in i[li].split(','):
+                
+                #Get the index position of the photo
+                index_pos = i[li].split(',').index(rec)
+                print('Image index position: ' + str(index_pos))
+
+                #Add a suffix as a means of dealing with multiple photos so they don't have duplicate names
+                suffix = index_pos + 1
+                print('Suffix: ' + str(suffix))
+
+                if i[f'{li}_captions'] == None or i[f'{li}_captions'].split(',')[index_pos] == '':
+                    print('No captions.  Using default.')
+                    file_name = i['sfdb_number'] + '-' + i['room_number'] + f"-{li.replace('_photos', '')}-" + str(suffix)
+
+                elif i[f'{li}_captions'] != None:
+                    print('Images contain captions.')
+                    print(i[f'{li}_captions'].split(',')[index_pos])
+                    file_name =  i['_title'] + '-' + str(i[f'{li}_captions'].split(',')[index_pos])
+                
+                else:
+                    file_name = i['sfdb_number'] + '-' + i['room_number'] + f"-{li.replace('_photos', '')}-" + str(suffix)
+                    
+                
+                
+                
+                #Get the photo object from Fulcrum API
+                photo = fulcrum.photos.media(rec)
+                with open(f'{file_name}.jpg', 'wb') as f:
+                    f.write(photo)
+                print(f'{file_name}.jpg' + ' saved')
             
-            
-            
-            #Get the photo object from Fulcrum API
-            photo = fulcrum.photos.media(rec)
-            with open(f'{file_name}.jpg', 'wb') as f:
-                f.write(photo)
-            print(f'{file_name}.jpg' + ' saved')
-        
-        print('---------- Finished with signage photos! ----------\n')
-        os.chdir(export_dir)
+            print(f'---------- Finished with {li}! ----------\n')
+            os.chdir(export_dir)
 
     #Get 360 photo
     print('\nGetting 360 photo')
