@@ -83,7 +83,7 @@ df = df.to_dict(orient='records')
 
 
 
-photos_to_process = ['signage_photos', 'door_hardware_photos']
+photos_to_process = ['signage_photos', 'door_hardware_photos','room_feature_photos']
 
 
 
@@ -134,7 +134,7 @@ for i in df:
                 elif i[f'{li}_captions'] != None:
                     print('Images contain captions.')
                     print(i[f'{li}_captions'].split(',')[index_pos])
-                    file_name =  i['_title'] + '-' + str(i[f'{li}_captions'].split(',')[index_pos])
+                    file_name =  i['sfdb_number'] + '-' + i['room_number']  + '-' + str(i[f'{li}_captions'].split(',')[index_pos])
                 
                 else:
                     file_name = i['sfdb_number'] + '-' + i['room_number'] + f"-{li.replace('_photos', '')}-" + str(suffix)
@@ -180,5 +180,96 @@ for i in df:
 
 
     os.chdir(export_dir)
+
+print('Room and photo downloads complete.\nGetting serialized equipment records and photos.')
+    import json
+'''
+Get parent id room key mappings.  
+This is needed because the child records aka repeatable sections
+don't have any of the parent record information except the record id
+'''
+
+equipment_base_dir = r'C:\Data\fmatic\serialized_equipment'
+sql = "Select _record_id,room_key from \"Space Inventory Field Survey Version 0.3\" WHERE survey_processed = 'no'"
+resp = fulcrum.query(sql, 'geojson')
+
+#Temp holders for the values
+parent_id = []
+record_rkey = []
+
+#
+for i in resp['features']:
+    parent_id.append(i['properties']['_record_id'])
+    record_rkey.append(i['properties']['room_key'])
+
+    
+#This contains parent record id room key pairs.  Used later to get rkey values    
+parent_map = dict(zip(parent_id,record_rkey))
+
+
+sql = "SELECT e.* from \"Space Inventory Field Survey Version 0.3/serialized_equipment\" e WHERE equipment_record_processed IS NULL OR equipment_record_processed = 'no'"
+
+resp = fulcrum.query(sql, 'geojson')
+
+os.chdir(r'C:\Data\fmatic')
+if not os.path.exists('.\serialized_equipment'):
+    os.mkdir('serialized_equipment')
+
+with open('serialized_equipment.json', 'w') as outfile:
+    json.dump(resp, outfile)
+
+
+parent_ids = []
+parent_ids = [record['properties']['_parent_id'] for record in resp['features'] ]
+
+os.chdir('.\serialized_equipment')
+
+for rec in resp['features']:
+    
+    assetid = rec['properties']['asset_id']
+    
+    
+    if rec['properties']['_parent_id'] in parent_map.keys():
+        rkey = parent_map.get(rec['properties']['_parent_id'])
+    else:
+        rkey = '000'
+    
+    dirname = str(rkey + '-' + assetid).replace(' ', '_')
+    if not os.path.exists(dirname):
+        os.mkdir(dirname)
+        print('Creating directory: ' + dirname)
+    else:
+        pass
+    print(dirname + ' already exists.')
+    
+    os.chdir(dirname)
+    
+   
+    #Get photos
+    if rec['properties']['equipment_photos'] == None:
+        pass
+    else:
+        i = 0
+        suffix = 1
+        
+        
+  
+        for photo in rec['properties']['equipment_photos']:
+            if rec['properties']['equipment_photos_captions'][i] == None:
+                filename = rec['properties']['asset_id']+ '-' + str(suffix) + '.jpg'
+            else:
+                filename = str(rec['properties']['equipment_photos_captions'][i]) + '.jpg'
+            
+            img = fulcrum.photos.media(photo)
+
+            with open(filename, 'wb') as f:
+                f.write(img)
+            print(filename + ' saved')
+            i +=1
+            suffix += 1
+    os.chdir(equipment_base_dir)
+    
+
+
        
     
